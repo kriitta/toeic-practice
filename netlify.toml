@@ -1,0 +1,16 @@
+# Netlify build configuration for this Vite app.
+# Without this, Netlify may publish the project root (raw source) instead of the
+# built output in `dist/`, which causes a blank white screen.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page app: serve index.html for any path so deep links don't 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
