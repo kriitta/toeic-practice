@@ -50,3 +50,35 @@ npm run preview
 แต่ละ question ใส่ `tag` ให้สื่อหัวข้อ (จะถูกนำไปวิเคราะห์จุดอ่อนอัตโนมัติ) ด่านใหม่ปลดล็อกตามลำดับเอง
 
 > เนื้อหาทั้งหมดเขียนใหม่ในสไตล์ข้อสอบ TOEIC (ภาษาธุรกิจ/ในที่ทำงาน) ไม่ได้คัดลอกจากข้อสอบจริงที่มีลิขสิทธิ์
+
+## 🔐 Login ด้วย Google + เก็บข้อมูลบนคลาวด์ (Firebase)
+
+แอปเล่นได้เลยโดยไม่ต้องล็อกอิน (เก็บใน localStorage ของเครื่องนั้น) แต่ถ้าตั้งค่า Firebase
+จะมีปุ่ม **"เข้าสู่ระบบ"** ด้วย Google เพื่อ sync ความคืบหน้า/ประวัติสอบ/highscore ข้ามอุปกรณ์
+
+### ขั้นตอนตั้งค่า (ทำครั้งเดียว)
+
+1. ไปที่ [Firebase Console](https://console.firebase.google.com/) → **Add project**
+2. **Authentication → Sign-in method →** เปิด **Google**
+3. **Firestore Database → Create database** (production mode) แล้วตั้ง **Rules** เป็น:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+4. **Project settings → Your apps → Web app (</>)** → คัดลอกค่า config มาใส่เป็น env vars
+   (ดูชื่อตัวแปรใน [.env.example](.env.example)) — ใส่ใน `.env` (สำหรับรันในเครื่อง) และใน
+   **Netlify → Site configuration → Environment variables** (สำหรับเว็บจริง)
+5. **Authentication → Settings → Authorized domains →** เพิ่มโดเมน Netlify
+   (เช่น `toeic-kriitta.netlify.app`) และ `localhost`
+6. Deploy ใหม่ — ปุ่มเข้าสู่ระบบจะปรากฏขึ้นเอง
+
+> ค่า `VITE_FIREBASE_*` เป็น public client config (เปิดเผยได้ตามปกติของ Firebase)
+> ความปลอดภัยมาจาก Firestore Rules ที่อนุญาตให้ผู้ใช้เข้าถึงเฉพาะข้อมูลของตัวเอง
+
+ไฟล์ที่เกี่ยวข้อง: [src/lib/firebase.ts](src/lib/firebase.ts) (init), [src/auth/AuthContext.tsx](src/auth/AuthContext.tsx) (สถานะล็อกอิน), [src/lib/cloud.ts](src/lib/cloud.ts) (sync + merge ข้อมูลกับ Firestore)

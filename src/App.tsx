@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Level, Part, Progress, Question } from './types'
 import { PARTS } from './data/curriculum'
 import { loadProgress, recordLevel, resetProgress, saveProgress, type AnsweredItem } from './lib/storage'
@@ -11,6 +11,8 @@ import {
   type MockAnswer,
   type MockResult as MockResultData,
 } from './lib/mock'
+import { useAuth } from './auth/AuthContext'
+import { pullAndMerge, pushSnapshot } from './lib/cloud'
 import { NavBar } from './components/NavBar'
 import { Dashboard } from './screens/Dashboard'
 import { PartView } from './screens/PartView'
@@ -40,12 +42,45 @@ type Route =
   | { name: 'mock-review'; result: MockResultData }
 
 export function App() {
+  const { user } = useAuth()
   const [progress, setProgress] = useState<Progress>(() => loadProgress())
   const [mockHistory, setMockHistory] = useState<MockResultData[]>(() => loadMockHistory())
   const [route, setRoute] = useState<Route>({ name: 'home' })
+  const syncedUid = useRef<string | null>(null)
+  const pushTimer = useRef<number>(0)
 
   useEffect(() => saveProgress(progress), [progress])
   useEffect(() => window.scrollTo(0, 0), [route])
+
+  // On login: pull the cloud copy, merge with local, then reload app state.
+  useEffect(() => {
+    if (!user) {
+      syncedUid.current = null
+      return
+    }
+    let cancelled = false
+    void pullAndMerge(user.uid).then(() => {
+      if (cancelled) return
+      setProgress(loadProgress())
+      setMockHistory(loadMockHistory())
+      syncedUid.current = user.uid
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  // Push to the cloud (debounced) whenever data changes while logged in.
+  useEffect(() => {
+    if (!user || syncedUid.current !== user.uid) return
+    const onChange = () => {
+      window.clearTimeout(pushTimer.current)
+      pushTimer.current = window.setTimeout(() => void pushSnapshot(user.uid), 900)
+    }
+    onChange()
+    window.addEventListener('cloud-sync', onChange)
+    return () => window.removeEventListener('cloud-sync', onChange)
+  }, [user, progress, mockHistory])
 
   const goHome = () => setRoute({ name: 'home' })
 

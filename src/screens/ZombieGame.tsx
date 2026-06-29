@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { VOCAB, type VocabWord } from '../data/vocab'
+import { bumpCloudSync } from '../lib/cloud'
 
 interface Props {
   onBack: () => void
@@ -102,6 +103,7 @@ export function ZombieGame({ onBack }: Props) {
       saveStats(next)
       return next
     })
+    bumpCloudSync()
   }
 
   const answer = (choice: Choice) => {
